@@ -1,0 +1,357 @@
+#This program sends for a defined time period random values ( = reverse, steps and delay times) to an arduino 
+# for moving a stepper motor randomly back and forth with random steps and a random delay between the steps ( =>
+#determing speed)
+
+# it is designed to work with ... stepper_turntable_v2_python2arduino_v2.ino ...
+
+# The key functions are:
+#    sendToArduino(str) which sends the given string to the Arduino. The string may 
+#                       contain characters with any of the values 0 to 255
+#
+#    recvFromArduino()  which returns an array. 
+#                         The first element contains the number of bytes that the Arduino said it included in
+#                             message. This can be used to check that the full message was received.
+#                         The second element contains the message as a string
+
+
+# the overall process:
+#   1) open the serial connection to the Arduino - which causes the Arduino to reset
+#   2) run this program and wait for a message from the Arduino to give it time to reset
+#   3) loop through a series of random values sent to the arduino for a specified period; feedback to and from the
+#    arduino is given
+
+# the message to be sent to the Arduino starts with < and ends with >
+#    the message content comprises 3 integers
+#    these numbers are sent as their ascii equivalents
+#    for example <1,200,1500>
+#    this means set the motor to a reverse direction, for 200 steps with a delay of 1.5 ms between each step interval 
+
+# receiving a message from the Arduino involves
+#    waiting until the startMarker is detected
+#    saving all subsequent bytes until the end marker is detected
+
+# NOTES
+#       this program does not include any timeouts to deal with delays in communication
+#
+#       for simplicity the program does NOT search for the comm port - the user must modify the
+#         code to include the correct reference.
+#         search for the lines 
+#               serPort = "COM6"
+#               baudRate = 9600
+#               ser = serial.Serial(serPort, baudRate)
+#
+
+
+#=====================================
+
+#  Function Definitions
+
+#=====================================
+
+def sendToArduino(sendStr):
+  ser.write(sendStr)
+
+
+#======================================
+
+def recvFromArduino():
+  global startMarker, endMarker
+  
+  ck = ""
+  x = "z" # any value that is not an end- or startMarker
+  byteCount = -1 # to allow for the fact that the last increment will be one too many
+  
+  # wait for the start character
+  while  ord(x) != startMarker: 
+    x = ser.read()
+  # save data until the end marker is found
+  while ord(x) != endMarker:
+    if ord(x) != startMarker:
+      ck = ck + x.decode('utf-8')
+      byteCount += 1
+    x = ser.read()
+  
+  return(ck)
+
+
+#============================
+
+def waitForArduino():
+
+   # wait until the Arduino sends 'Arduino Ready' - allows time for Arduino reset
+   # it also ensures that any bytes left over from a previous message are discarded
+   
+    global startMarker, endMarker
+    
+    msg = ""
+    while msg.find("Arduino is ready") == -1:
+
+      while ser.inWaiting() == 0:
+        pass
+        
+      msg = recvFromArduino()
+
+      print (msg)
+      
+#======================================
+
+def runTest(td,count):
+  numLoops = len(td)
+  waitingForReply = False
+
+  n = 0
+  while n < numLoops:
+
+    varstr = td[n]
+
+    if waitingForReply == False:
+      sendToArduino(varstr)
+      print ("Sent from PC -- LOOP # " + str(count) + ": " + varstr.decode('utf-8'))
+      waitingForReply = True
+
+    if waitingForReply == True:
+
+      while ser.inWaiting() == 0:
+        pass
+        
+      dataRecvd = recvFromArduino()
+      print ("Reply from Arduino -- Received: " + dataRecvd)
+      n += 1
+      waitingForReply = False
+
+      print ("===========")
+    
+#======================================
+def filematch(pathname):
+    import glob
+    import os
+
+    list_of_files = glob.glob(pathname + "*.txt")
+    latest_file = max(list_of_files, key=os.path.getctime)
+    latest_file = os.path.basename(latest_file)
+    return (latest_file)
+
+#======================================
+def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog):
+    packetsDropList = {}
+    errorcount  = 0
+    PDSUMperc = '0'
+    LPD = '0'
+    #Trodes outputs
+    warningLog = "Warning-- packets dropped:"
+    errorLog = "Error: no data coming from hardware"
+    packetdropLog = "percent packet drops"
+    largestdropLog = "Largest drop event:"
+    timestampLog = "timestamp"
+    #look through all log lines
+    packetsDropList = {}
+    errorcount  = 0
+    with open(logPathname + logFolder + '/' + newestFilename, 'r') as my_file:
+        for line in my_file:
+            if line.strip().find(warningLog) > -1:
+                indxstart = line.strip().find(timestampLog)+len(timestampLog)+1
+                foundtimestamp = line.strip()[indxstart:]
+                indxstart = line.strip().find(warningLog)+len(warningLog)+1
+                indxend = line.strip().find("at")-1
+                packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
+            if line.strip().find(errorLog) > -1:
+                errorcount += 1
+            if line.strip().find(packetdropLog) > -1:
+                indxstart = line.strip().find(testDate[-4:])+5
+                indxend = line.strip().find(packetdropLog)-1
+                PDSUMperc = line.strip()[indxstart:indxend]
+            if line.strip().find(largestdropLog) > -1:
+                indxstart = line.strip().find(largestdropLog)+len(largestdropLog)+1
+                indxend = line.strip().find("packets")-1
+                LPD = line.strip()[indxstart:indxend]
+        #PD = packets dropped (events)
+        #PD % = is percentage of package dropped
+        #LPD = largest packet dropped
+        #Disconnects = Error in data acquisition events
+        print("All PDs: ")
+        print(packetsDropList)
+        print("PD: " + PDSUMperc + "%")
+        print("LPD: " + LPD)
+        print("Disconnects: " + str(errorcount) + "x")
+        
+        outputFilename = "TurningInformation_" + newestFilename
+        #write turning information into a new file
+        with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
+            my_writefile.write("Turning information (timestamp in seconds: direction change, step number and delay value in micros): \n")
+            for key,value in turningInfoLog.items():
+                my_writefile.write(str(key) + ": " + str(value) + "\n") 
+        my_writefile.close()
+        
+        outputFilename = "Summary_" + newestFilename
+        #write summary of Trodes Logs into new file
+        with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
+            my_writefile.write("Commutator testing on SpikeGadget's Testing Rig\n")#still add which cables, which device
+            my_writefile.write("Testing date: " + testDate + "\n")
+            my_writefile.write("Total testing time: " + testingTimevalue + "sec\n")
+            my_writefile.write("All packet dropped events (timestamp TS: packet drop PD amount): \n")
+            for key,value in packetsDropList.items():
+                my_writefile.write(key + ": " + value + "\n")
+            my_writefile.write("Overall percentage of packets dropped: " + PDSUMperc + "%\n")
+            my_writefile.write("Largest packet drop amount: " + LPD + "\n")
+            my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
+        my_writefile.close()
+        
+#======================================
+def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog):
+    import os, os.path
+    #paths and filenames
+    logPathname = "D:/Google Drive/SpikeGadgets/Production/Trodes2-0-0/"
+    logFolder  = "debugLogs"
+    logFilename = "trodesDebugLog_" + testDate +"(" + starttestingTime
+    outputPathname = "D:/Google Drive/SpikeGadgets/Production/Testing_Rig_Results/"
+    outputFolder = "TestingResultLogs"
+    #ensure output folder exists
+    isdir = os.path.isdir(outputPathname + outputFolder + '/')
+    if isdir == False:
+        os.mkdir(outputPathname + outputFolder)
+    #grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
+    newestFilename = filematch(logPathname + logFolder + '/')
+    if newestFilename.find(logFilename) > -1:
+        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog)
+    else:
+        logFilename = "trodesDebugLog_" + testDate +"(" + testHourmargin.strftime("%H_") 
+        if newestFilename.find(logFilename) > -1:
+            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog)
+        else:
+            print("Error! No matching Trodes Logs found...")
+
+#======================================
+def pythonLog(timestamp, directionValue, stepNumber, delayValue):
+    turningInfo.append([timestamp, directionValue, stepNumber, delayValue])
+#======================================
+
+# Main Program
+#Controlling stepper motor connected to an arduino
+#======================================
+
+import serial
+import time
+import random
+from datetime import datetime
+import numpy as np
+import time
+from datetime import date
+
+print()
+print()
+
+# NOTE: ensure that the serial port and baudrate (same setting in arduino) are correct
+serPort = "COM3"
+baudRate = 9600
+try:
+    ser = serial.Serial(serPort, baudRate)
+except:
+    print("Error with COM port...")
+#print("Serial port " + serPort + " opened  Baudrate " + str(baudRate))
+
+startMarker = 60
+endMarker = 62
+stepsmin = 100
+stepsmax = 500
+delaytime = 1500
+entryOK = 0;
+
+# Enter commutator model type, ID and for which lab:
+while entryOK == 0:
+  modelType = input("Enter commutator model type: ")
+  print(" ")
+  print("You entered: ")
+  print(modelType)
+  entryOK = input("OK? (yes=1, no=0)")
+end
+entryOK = 0;
+while entryOK == 0:
+  modelID = input("Enter commutator model ID: ")
+  print(" ")
+  print("You entered: ")
+  print(modelID)
+  entryOK = input("OK? (yes=1, no=0)")
+end
+entryOK = 0;
+while entryOK == 0:
+  labID = input("Enter Lab: ")
+  print(" ")
+  print("You entered: ")
+  print(labID)
+  entryOK = input("OK? (yes=1, no=0)")
+end
+
+print("Before testing start, ensure that Trodes is iniated new for this test ")
+print("this ensures a new log...")
+input("Press Enter to start...")
+print()
+print()
+print ("===========")
+print ("===========")
+print("Waiting for arduino...")
+waitForArduino()
+testTime = 15 #*30
+start = time.time()
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
+starttestingTime = now.strftime("%H_")
+testToday = date.today()
+testDate = testToday.strftime("%m-%d-%Y")
+testHourmargin = now.replace( hour = now.hour - 1)
+print("Testing date: ", testDate)
+print("Testing time start: ", current_time)
+print("Testing for " + str(testTime) + " (sec)")
+print ("===========")
+print ("===========")
+print()
+print()
+loopcount = 0
+turningInfoLog = {}
+while time.time() - start < testTime:
+    testData = []
+    loopcount+=1
+    reverse = random.randrange(0,2,1)
+    steps = random.randrange(stepsmin,stepsmax+1,1)
+    cmd = '<' + str(reverse) + "," + str(steps) + "," + str(delaytime) + ">"
+    testData.append(bytes(cmd, 'utf-8')) 
+    turningInfoLog[time.time()] = [reverse, steps, delaytime]
+    print ("===========")
+    runTest(testData, loopcount)
+    #testData = []
+    #cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
+    #testData.append(bytes(cmd, 'utf-8'))
+    #print("Sending stop...")
+    #runTest(testData, loopcount)
+    #time.sleep(.1)
+    print()
+    print()
+    print("***********")
+    print("Time until testing done : " + str(testTime -(time.time() - start)) + " (sec)")
+    print("***********")
+    print()
+    print()
+testData = []
+cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
+testData.append(bytes(cmd, 'utf-8'))
+print("Sending stop...")
+runTest(testData, loopcount + 1)
+print("Done testing")
+testingTimevalue = str(time.time() - start)
+print("Testing time: " + testingTimevalue + " (sec)")
+ser.close()
+print()
+print()
+print("***********")
+print("Testing Done, stop streaming in Trodes")
+input("Press Enter to grab Trodes Log...")
+print("Grabbing Trodes Logs for this test...")
+grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog)
+print("Done")
+entryOK = 0;
+while entryOK == 0:
+  addNotes = input("Additional notes: ")
+  print(" ")
+  print("You entered: ")
+  print(addNotes)
+  entryOK = input("OK? (yes=1, no=0)")
+end
