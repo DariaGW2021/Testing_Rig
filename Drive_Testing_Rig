@@ -132,7 +132,7 @@ def filematch(pathname):
     return (latest_file)
 
 #======================================
-def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog):
+def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog, modelType, modelID, labID, addNotes):
     packetsDropList = {}
     errorcount  = 0
     PDSUMperc = '0'
@@ -195,15 +195,15 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
             my_writefile.write("Largest packet drop amount: " + LPD + "\n")
             my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
         my_writefile.close()
-        
+        write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, testDate, outputFilename, addNotes)
 #======================================
-def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog):
+def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog,, modelType, modelID, labID, addNotes):
     import os, os.path
     #paths and filenames
     logPathname = "D:/Google Drive/SpikeGadgets/Production/Trodes2-0-0/"
     logFolder  = "debugLogs"
     logFilename = "trodesDebugLog_" + testDate +"(" + starttestingTime
-    outputPathname = "D:/Google Drive/SpikeGadgets/Production/Testing_Rig_Results/"
+    outputPathname = "D:/Google Drive/SpikeGadgets/Production/Commutator_Testing_Rig_Results/"
     outputFolder = "TestingResultLogs"
     #ensure output folder exists
     isdir = os.path.isdir(outputPathname + outputFolder + '/')
@@ -212,17 +212,47 @@ def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, 
     #grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
     newestFilename = filematch(logPathname + logFolder + '/')
     if newestFilename.find(logFilename) > -1:
-        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog)
+        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog, modelType, modelID, labID, addNotes)
     else:
         logFilename = "trodesDebugLog_" + testDate +"(" + testHourmargin.strftime("%H_") 
         if newestFilename.find(logFilename) > -1:
-            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog)
+            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog, modelType, modelID, labID, addNotes)
         else:
             print("Error! No matching Trodes Logs found...")
 
 #======================================
 def pythonLog(timestamp, directionValue, stepNumber, delayValue):
     turningInfo.append([timestamp, directionValue, stepNumber, delayValue])
+#======================================
+def write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, testDate, outputFilename, addNotes):
+
+  import pandas as pd
+  import os, os.path
+  import csv
+  
+  testRoutine = "Random turning with seed"
+  excelfilename = "Commutator_Testing_Results.csv"
+  #ensure output folder exists
+  isdir = os.path.isdir(outputPathname + outputFolder + '/')
+  if isdir == False:
+      os.mkdir(outputPathname + outputFolder)
+  #ensure output file exists
+  isfile = os.path.isfile(outputPathname + outputFolder + '/' + excelfilename)
+  if isfile == False:
+  #if not, create with headers
+      with open(outputPathname + outputFolder + '/' + excelfilename, 'w') as my_writefile:
+          headers = pd.DataFrame( {'Model': [],
+                          'Serial': [], 
+                          'Lab': [], 
+                          'Date': [], 
+                          'TestRoutine': [],
+                          'TestResults': [],
+                          'Notes': []})
+          headers.to_csv(my_writefile)
+  my_writefile.close()
+  commResults = pd.read_csv(outputPathname + outputFolder + '/' + excelfilename)
+  df = pd.DataFrame(commResults)
+  df.loc[len(df.index)] = [modelType, modelID, testDate, testRoutine, pathname, addNotes]
 #======================================
 
 # Main Program
@@ -258,29 +288,21 @@ entryOK = 0;
 
 # Enter commutator model type, ID and for which lab:
 while entryOK == 0:
+  print(" ")
   modelType = input("Enter commutator model type: ")
   print(" ")
-  print("You entered: ")
-  print(modelType)
-  entryOK = input("OK? (yes=1, no=0)")
-end
-entryOK = 0;
-while entryOK == 0:
   modelID = input("Enter commutator model ID: ")
   print(" ")
-  print("You entered: ")
-  print(modelID)
-  entryOK = input("OK? (yes=1, no=0)")
-end
-entryOK = 0;
-while entryOK == 0:
   labID = input("Enter Lab: ")
   print(" ")
   print("You entered: ")
+  print(modelType)
+  print(modelID)
   print(labID)
+  print(" ")
   entryOK = input("OK? (yes=1, no=0)")
-end
-
+  
+print(" ")
 print("Before testing start, ensure that Trodes is iniated new for this test ")
 print("this ensures a new log...")
 input("Press Enter to start...")
@@ -344,9 +366,6 @@ print()
 print("***********")
 print("Testing Done, stop streaming in Trodes")
 input("Press Enter to grab Trodes Log...")
-print("Grabbing Trodes Logs for this test...")
-grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog)
-print("Done")
 entryOK = 0;
 while entryOK == 0:
   addNotes = input("Additional notes: ")
@@ -354,4 +373,7 @@ while entryOK == 0:
   print("You entered: ")
   print(addNotes)
   entryOK = input("OK? (yes=1, no=0)")
-end
+print("Grabbing Trodes Logs for this test...")
+grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog, modelType, modelID, labID, addNotes)
+print("Done")
+
