@@ -144,41 +144,57 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
     from statistics import mean
     packetsDropList = {}
     errorcount  = 0
-    PDSUMperc = '0'
-    LPD = '0'
+    TPD = "0"
+    PDSUMperc = "0"
+    LPD = "0"
     # Trodes outputs
+    streamingStats = "Streaming stats"
     warningLog = "Warning-- packets dropped:"
     errorLog = "Error: no data coming from hardware"
+    totalpacketdropLog = "total packets dropped"
     packetdropLog = "percent packet drops"
     largestdropLog = "Largest drop event:"
     timestampLog = "timestamp"
     # look through all log lines
     packetsDropList = {}
     errorcount  = 0
-    with open(logPathname + logFolder + '/' + newestFilename, 'r') as my_file:
-        for line in my_file:
-            if line.strip().find(warningLog) > -1:
-                indxstart = line.strip().find(timestampLog)+len(timestampLog)+1
-                foundtimestamp = line.strip()[indxstart:]
-                indxstart = line.strip().find(warningLog)+len(warningLog)+1
-                indxend = line.strip().find("at")-1
-                packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
-            if line.strip().find(errorLog) > -1:
-                errorcount += 1
-            if line.strip().find(packetdropLog) > -1:
-                indxstart = line.strip().find(testDate[-4:])+5
-                indxend = line.strip().find(packetdropLog)-1
-                PDSUMperc = line.strip()[indxstart:indxend]
-            if line.strip().find(largestdropLog) > -1:
-                indxstart = line.strip().find(largestdropLog)+len(largestdropLog)+1
-                indxend = line.strip().find("packets")-1
-                LPD = line.strip()[indxstart:indxend]
+    logInis = [-5]
+    with open("C:/Users/daria/Google Drive/spikegadgets_daria/Testing_Rig/TrodesLogs" + '/' + "trodesDebugLog_05-04-2021(11_42_06).txt", 'r') as my_file:
+        # check how many separate Trode streams
+        for linevalue,line in enumerate(my_file):
+            if line.strip().find(streamingStats) > -1:   
+                logInis.append(linevalue)  
+        my_file.close()
+    with open("C:/Users/daria/Google Drive/spikegadgets_daria/Testing_Rig/TrodesLogs" + '/' + "trodesDebugLog_05-04-2021(11_42_06).txt", 'r') as my_file:
+        for linevalue,line in enumerate(my_file):
+            # grab latest stream
+            if linevalue > logInis[-2] + 5:
+                if line.strip().find(warningLog) > -1:
+                    indxstart = line.strip().find(timestampLog)+len(timestampLog)+1
+                    foundtimestamp = line.strip()[indxstart:]
+                    indxstart = line.strip().find(warningLog)+len(warningLog)+1
+                    indxend = line.strip().find("at")-1
+                    packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
+                if line.strip().find(errorLog) > -1:
+                    errorcount += 1
+                if line.strip().find(totalpacketdropLog) > -1:
+                    indxend = line.strip().find(totalpacketdropLog)-1
+                    TPD = line.strip()[0:indxend]
+                if line.strip().find(packetdropLog) > -1:
+                    indxend = line.strip().find(packetdropLog)-1
+                    PDSUMperc = line.strip()[0:indxend]
+                if line.strip().find(largestdropLog) > -1:
+                    indxstart = line.strip().find(largestdropLog)+len(largestdropLog)+1
+                    indxend = line.strip().find("packets")-1
+                    LPD = line.strip()[indxstart:indxend]
         #PD = packets dropped (events)
+        #TPD = total packets dropped
         #PD % = is percentage of packet dropped
         #LPD = largest packet dropped
         #Disconnects = Error in data acquisition events
         print("All PDs: ")
         print(packetsDropList)
+        print("TPD: " + TPD)
         print("PD: " + PDSUMperc + "%")
         print("LPD: " + LPD)
         print("Disconnects: " + str(errorcount) + "x")
@@ -204,6 +220,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
             my_writefile.write("All packet dropped events (timestamp TS: packet drop PD amount): \n")
             for key,value in packetsDropList.items():
                 my_writefile.write(key + ": " + value + "\n")
+            my_writefile.write("Total packet drop amount: " + TPD + "\n")
             my_writefile.write("Overall percentage of packets dropped: " + PDSUMperc + "%\n")
             my_writefile.write("Largest packet drop amount: " + LPD + "\n")
             my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
@@ -223,6 +240,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
             if len(pdlist) == 0:
                 pdlist.append(0)
             my_writefile.write("Mean packet drop: " + str(mean(pdlist)) + "\n")
+            my_writefile.write("Total packet drop amount: " + TPD + "\n")
             my_writefile.write("Overall percentage of packets dropped: " + PDSUMperc + "%\n")
             my_writefile.write("Largest packet drop amount: " + LPD + "\n")
             my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
