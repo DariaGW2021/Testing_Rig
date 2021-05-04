@@ -16,9 +16,11 @@
 
 # the overall process:
 #   1) open the serial connection to the Arduino - which causes the Arduino to reset
-#   2) run this program and wait for a message from the Arduino to give it time to reset
-#   3) loop through a series of random values sent to the arduino for a specified period; feedback to and from the
+#   2) User defined values for commutator type, ID and Lab ID are entered
+#   3) run this program and wait for a message from the Arduino to give it time to reset
+#   4) loop through a series of random values sent to the arduino for a specified period; feedback to and from the
 #    arduino is given
+#   5) results (=packet drops) are grabbed from Trodes debugLog files and given as different ouptput files
 
 # the message to be sent to the Arduino starts with < and ends with >
 #    the message content comprises 3 integers
@@ -47,14 +49,15 @@
 #  Function Definitions
 
 #=====================================
-
 def sendToArduino(sendStr):
+
   ser.write(sendStr)
 
-
 #======================================
-
 def recvFromArduino():
+  
+  # communication with arduino to check it has received turning information
+  
   global startMarker, endMarker
   
   ck = ""
@@ -73,9 +76,7 @@ def recvFromArduino():
   
   return(ck)
 
-
 #============================
-
 def waitForArduino():
 
    # wait until the Arduino sends 'Arduino Ready' - allows time for Arduino reset
@@ -90,12 +91,13 @@ def waitForArduino():
         pass
         
       msg = recvFromArduino()
-
       print (msg)
       
 #======================================
-
 def runTest(td,count):
+  
+  # communication with arduino to send values for running motor
+  
   numLoops = len(td)
   waitingForReply = False
 
@@ -123,6 +125,9 @@ def runTest(td,count):
     
 #======================================
 def filematch(pathname):
+
+    # find latest Trodes debugLog file
+    
     import glob
     import os
 
@@ -132,18 +137,22 @@ def filematch(pathname):
     return (latest_file)
 
 #======================================
-def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog, modelType, modelID, labID, addNotes):
+def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
+    
+    # save information from User and Trodes debugLog into cvs and txt files and into global excel sheet
+    
+    from statistics import mean
     packetsDropList = {}
     errorcount  = 0
     PDSUMperc = '0'
     LPD = '0'
-    #Trodes outputs
+    # Trodes outputs
     warningLog = "Warning-- packets dropped:"
     errorLog = "Error: no data coming from hardware"
     packetdropLog = "percent packet drops"
     largestdropLog = "Largest drop event:"
     timestampLog = "timestamp"
-    #look through all log lines
+    # look through all log lines
     packetsDropList = {}
     errorcount  = 0
     with open(logPathname + logFolder + '/' + newestFilename, 'r') as my_file:
@@ -165,7 +174,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
                 indxend = line.strip().find("packets")-1
                 LPD = line.strip()[indxstart:indxend]
         #PD = packets dropped (events)
-        #PD % = is percentage of package dropped
+        #PD % = is percentage of packet dropped
         #LPD = largest packet dropped
         #Disconnects = Error in data acquisition events
         print("All PDs: ")
@@ -175,7 +184,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         print("Disconnects: " + str(errorcount) + "x")
         
         outputFilename = "TurningInformation_" + newestFilename
-        #write turning information into a new file
+        # write turning information into a new file
         with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
             my_writefile.write("Turning information (timestamp in seconds: direction change, step number and delay value in micros): \n")
             for key,value in turningInfoLog.items():
@@ -183,11 +192,15 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         my_writefile.close()
         
         outputFilename = "Summary_" + newestFilename
-        #write summary of Trodes Logs into new file
+        # write summary of Trodes Logs into new file
         with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
-            my_writefile.write("Commutator testing on SpikeGadget's Testing Rig\n")#still add which cables, which device
+            my_writefile.write("Commutator testing on SpikeGadget's Testing Rig\n")
+            my_writefile.write("Commutator type: " + modelType + "\n")
+            my_writefile.write("Commutator ID: " + modelID + "\n")
+            my_writefile.write("Lab: " + labID + "\n")
             my_writefile.write("Testing date: " + testDate + "\n")
             my_writefile.write("Total testing time: " + testingTimevalue + "sec\n")
+            my_writefile.write("Testing seed: " +  str(seedValue) + "\n")
             my_writefile.write("All packet dropped events (timestamp TS: packet drop PD amount): \n")
             for key,value in packetsDropList.items():
                 my_writefile.write(key + ": " + value + "\n")
@@ -195,42 +208,67 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
             my_writefile.write("Largest packet drop amount: " + LPD + "\n")
             my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
         my_writefile.close()
-        write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, testDate, outputFilename, addNotes)
+        
+        outputFilename = "PacketDropInformation_" + newestFilename
+        # write packet drop information into a new file
+        with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
+            pdlist= []
+            for key,value in packetsDropList.items():
+                my_writefile.write(key + ": " + value + "\n")
+                pdlist.append(value)
+            my_writefile.write("Mean packet drop: " + mean(pdlist) + "\n")
+            my_writefile.write("Overall percentage of packets dropped: " + PDSUMperc + "%\n")
+            my_writefile.write("Largest packet drop amount: " + LPD + "\n")
+            my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
+        my_writefile.close()
+        
+        # write into global excel sheet
+        write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes)
+        
 #======================================
-def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog,, modelType, modelID, labID, addNotes):
+def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog,, modelType, modelID, labID, addNotes):
+   
+   # get information from Trodes debugLog file and forward to seperate cvs and summary txt files
+    
     import os, os.path
-    #paths and filenames
+    # paths and filenames
     logPathname = "D:/Google Drive/SpikeGadgets/Production/Trodes2-0-0/"
     logFolder  = "debugLogs"
     logFilename = "trodesDebugLog_" + testDate +"(" + starttestingTime
     outputPathname = "D:/Google Drive/SpikeGadgets/Production/Commutator_Testing_Rig_Results/"
     outputFolder = "TestingResultLogs"
-    #ensure output folder exists
+    # ensure output folder exists
     isdir = os.path.isdir(outputPathname + outputFolder + '/')
     if isdir == False:
         os.mkdir(outputPathname + outputFolder)
-    #grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
+    # grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
     newestFilename = filematch(logPathname + logFolder + '/')
     if newestFilename.find(logFilename) > -1:
-        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog, modelType, modelID, labID, addNotes)
+        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
     else:
         logFilename = "trodesDebugLog_" + testDate +"(" + testHourmargin.strftime("%H_") 
         if newestFilename.find(logFilename) > -1:
-            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, turningInfoLog, modelType, modelID, labID, addNotes)
+            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
         else:
             print("Error! No matching Trodes Logs found...")
 
 #======================================
 def pythonLog(timestamp, directionValue, stepNumber, delayValue):
+    
+    # add each turning event into log
+    
     turningInfo.append([timestamp, directionValue, stepNumber, delayValue])
+    
 #======================================
-def write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, testDate, outputFilename, addNotes):
-
+def write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes):
+  
+  # write test information into global excel sheet
+  
   import pandas as pd
   import os, os.path
   import csv
   
-  testRoutine = "Random turning with seed"
+  testRoutine = "Random turning with seed value of " + str(seedValue)
   excelfilename = "Commutator_Testing_Results.csv"
   #ensure output folder exists
   isdir = os.path.isdir(outputPathname + outputFolder + '/')
@@ -253,10 +291,13 @@ def write2excelsheet(outputPathname, outputFolder, modelType, modelID, labID, te
   commResults = pd.read_csv(outputPathname + outputFolder + '/' + excelfilename)
   df = pd.DataFrame(commResults)
   df.loc[len(df.index)] = [modelType, modelID, testDate, testRoutine, pathname, addNotes]
+  
 #======================================
 
 # Main Program
-#Controlling stepper motor connected to an arduino
+
+# Controlling stepper motor connected to an arduino
+
 #======================================
 
 import serial
@@ -281,11 +322,20 @@ except:
 
 startMarker = 60
 endMarker = 62
-stepsmin = 100
-stepsmax = 500
-delaytime = 1500
-entryOK = 0;
 
+# delay between each step in microseconds 
+delaytime = 1500 
+# calculate steps per revolution, default motor is 200 steps per revolution with 10 ms delay between steps
+SPR = ((delaytime/1000)*200)/10
+
+# set min and max revolutions 
+revolutionmin = 2
+revolutionmax = 8
+# calculate steps to send to motor
+stepsmin = round(revolutionmin*SPR)
+stepsmax = round(revolutionmax*SPR)
+
+entryOK = 0;
 # Enter commutator model type, ID and for which lab:
 while entryOK == 0:
   print(" ")
@@ -312,7 +362,10 @@ print ("===========")
 print ("===========")
 print("Waiting for arduino...")
 waitForArduino()
+
+# set test time
 testTime = 15 #*30
+
 start = time.time()
 now = datetime.now()
 current_time = now.strftime("%H:%M:%S")
@@ -327,6 +380,11 @@ print ("===========")
 print ("===========")
 print()
 print()
+
+# set random seed
+seedValue = 5
+random.seed(seedValue)
+
 loopcount = 0
 turningInfoLog = {}
 while time.time() - start < testTime:
@@ -374,6 +432,6 @@ while entryOK == 0:
   print(addNotes)
   entryOK = input("OK? (yes=1, no=0)")
 print("Grabbing Trodes Logs for this test...")
-grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, turningInfoLog, modelType, modelID, labID, addNotes)
+grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
 print("Done")
 
