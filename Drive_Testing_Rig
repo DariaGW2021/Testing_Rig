@@ -209,22 +209,26 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
             my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
         my_writefile.close()
         
+        # write into global excel sheet
+        write2excelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes)
+        
         outputFilename = "PacketDropInformation_" + newestFilename
         # write packet drop information into a new file
         with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
+            my_writefile.write("Packet drop events (timestamp:sample size):\n")
             pdlist= []
             for key,value in packetsDropList.items():
-                my_writefile.write(key + ": " + value + "\n")
-                pdlist.append(value)
-            my_writefile.write("Mean packet drop: " + mean(pdlist) + "\n")
+                my_writefile.write(key[2:] + ": " + value[2:] + "\n")
+                pdlist.append(int(value[2:]))
+            if len(pdlist) == 0:
+                pdlist.append(0)
+            my_writefile.write("Mean packet drop: " + str(mean(pdlist)) + "\n")
             my_writefile.write("Overall percentage of packets dropped: " + PDSUMperc + "%\n")
             my_writefile.write("Largest packet drop amount: " + LPD + "\n")
             my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
         my_writefile.close()
         
-        # write into global excel sheet
-        write2excelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes)
-        
+       
 #======================================
 def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog,, modelType, modelID, labID, addNotes):
    
@@ -232,7 +236,9 @@ def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, 
     
     import os, os.path
     # paths and filenames
-    logPathname = "D:/Google Drive/SpikeGadgets/Production/Trodes2-0-0/"
+    # Trodes version
+    trodesVersion = "Trodes_2-0-1betav1_Windows64/win64/"
+    logPathname = "D:/Google Drive/SpikeGadgets/Production/" + trodesVersion
     logFolder  = "debugLogs"
     logFilename = "trodesDebugLog_" + testDate +"(" + starttestingTime
     outputPathname = "D:/Google Drive/SpikeGadgets/Production/Commutator_Testing_Rig_Results/"
@@ -245,11 +251,11 @@ def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, 
     # grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
     newestFilename = filematch(logPathname + logFolder + '/')
     if newestFilename.find(logFilename) > -1:
-        filematched(excelfilename, logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename,  testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
     else:
         logFilename = "trodesDebugLog_" + testDate +"(" + testHourmargin.strftime("%H_") 
         if newestFilename.find(logFilename) > -1:
-            filematched(excelfilename, logPathname, logFolder, newestFilename, outputPathname, outputFolder, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder,excelfilename, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
         else:
             print("Error! No matching Trodes Logs found...")
 
