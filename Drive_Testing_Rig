@@ -159,13 +159,13 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
     packetsDropList = {}
     errorcount  = 0
     logInis = [-5]
-    with open("C:/Users/daria/Google Drive/spikegadgets_daria/Testing_Rig/TrodesLogs" + '/' + "trodesDebugLog_05-04-2021(11_42_06).txt", 'r') as my_file:
+    with open(logPathname + logFolder + '/' + newestFilename, 'r') as my_file:
         # check how many separate Trode streams
         for linevalue,line in enumerate(my_file):
             if line.strip().find(streamingStats) > -1:   
                 logInis.append(linevalue)  
         my_file.close()
-    with open("C:/Users/daria/Google Drive/spikegadgets_daria/Testing_Rig/TrodesLogs" + '/' + "trodesDebugLog_05-04-2021(11_42_06).txt", 'r') as my_file:
+    with open(logPathname + logFolder + '/' + newestFilename, 'r') as my_file:
         for linevalue,line in enumerate(my_file):
             # grab latest stream
             if linevalue > logInis[-2] + 5:
@@ -248,7 +248,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         
        
 #======================================
-def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog,, modelType, modelID, labID, addNotes):
+def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
    
    # get information from Trodes debugLog file and forward to seperate cvs and summary txt files
     
