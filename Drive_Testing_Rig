@@ -1,5 +1,4 @@
 #This program sends for a defined time period random values ( = direction, steps and delay times) to an arduino 
-#This program sends for a defined time period random values ( = direction, steps and delay times) to an arduino 
 # for moving a stepper motor randomly back and forth with random steps and a random delay between the steps ( =>
 #determing speed)
 
@@ -144,7 +143,9 @@ def write2turninginfosheet(outputPathname, outputFolder, newestFilename, fileExt
     commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename, index = False)
 
 #======================================
-def write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, TPD, PDSUMperc, LPD, errorcount): 
+def write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType,
+                      modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, 
+                      TPD, PDSUMperc, LPD, errorcount): 
     
     # write test information into summary txt file
     
@@ -167,7 +168,8 @@ def write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtensio
          my_writefile.close()
 
 #======================================
-def write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, testingTimevalue, packetsDropList, TPD, PDSUMperc, LPD, errorcount):
+def write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, testingTimevalue,
+                      packetsDropList, TPD, PDSUMperc, LPD, errorcount):
     
     # write single packet drop information into excel file
     
@@ -209,11 +211,13 @@ def write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtensio
                                        'Total packet drop': TPD,
                                        'Percentage packet drop': PDSUMperc,
                                        'Largest packet drop': LPD,
-                                       'complete headstage disconnects': str(errorcount)}, ignore_index = True)
+                                       'complete headstage disconnects': str(errorcount)}, 
+                                        ignore_index = True)
     commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename, index = False)
          
 #=======================================
-def write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, testingTimevalue, outputFilename, addNotes):
+def write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID,
+                           testDate, seedValue, testingTimevalue, outputFilename, addNotes):
   
     # write test information into global excel file
 
@@ -250,7 +254,9 @@ def write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelTyp
     addResults.to_csv(outputPathname + outputFolder + '/' + excelfilename, index = False)
        
 #======================================
-def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, fileExtension, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
+def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename,
+                fileExtension, trodesTime, testingTimevalue, testDate, seedValue, turningInfoLog,
+                modelType, modelID, labID, addNotes):
     
     # save information from User and Trodes debugLog into excel and txt files and into global excel file
     
@@ -284,9 +290,11 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
                 if line.strip().find(warningLog) > -1:
                     indxstart = line.strip().find(timestampLog)+len(timestampLog)+1
                     foundtimestamp = line.strip()[indxstart:]
-                    indxstart = line.strip().find(warningLog)+len(warningLog)+1
-                    indxend = line.strip().find("at")-1
-                    packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
+                    # ensure time stamp is larger than test start time
+                    if int(foundtimestamp) >= trodesTime:
+                        indxstart = line.strip().find(warningLog)+len(warningLog)+1
+                        indxend = line.strip().find("at")-1
+                        packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
                 if line.strip().find(errorLog) > -1:
                     errorcount += 1
                 if line.strip().find(totalpacketdropLog) > -1:
@@ -315,16 +323,21 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         write2turninginfosheet(outputPathname, outputFolder, newestFilename, fileExtension, turningInfoLog)
         
         # write summary of Trodes Logs into txt file
-        write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
+        write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, 
+                          modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, 
+                          TPD, PDSUMperc, LPD, errorcount)
         
         # write into global excel sheet
-        write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, testingTimevalue, outputFilename, addNotes)
+        write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, 
+                               labID, testDate, seedValue, testingTimevalue, outputFilename, addNotes)
         
         # write into excel sheets
-        write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, testingTimevalue, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
+        write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, testingTimevalue, 
+                          packetsDropList, TPD, PDSUMperc, LPD, errorcount)
         
 #======================================
-def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, fileExtension, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
+def grabTrodesLog(testDate, trodesTime, starttestingTime, testHourmargin, testingTimevalue, fileExtension, 
+                  seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
    
    # get information from Trodes debugLog file and forward to seperate excel and summary txt file
     
@@ -345,11 +358,15 @@ def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, 
     # grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
     newestFilename = filematch(logPathname + logFolder + '/')
     if newestFilename.find(logFilename) > -1:
-        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, fileExtension, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename,
+                    fileExtension, trodesTime, testingTimevalue, testDate, seedValue, turningInfoLog, 
+                    modelType, modelID, labID, addNotes)
     else:
         logFilename = "trodesDebugLog_" + testDate +"(" + testHourmargin.strftime("%H_") 
         if newestFilename.find(logFilename) > -1:
-            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, fileExtension, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, 
+                        fileExtension, trodesTime, testingTimevalue, testDate, seedValue, turningInfoLog, 
+                        modelType, modelID, labID, addNotes)
         else:
             print("Error! No matching Trodes Logs found...")
 
@@ -376,17 +393,22 @@ import random
 from datetime import datetime
 import time
 from datetime import date
+from trodesnetwork import trodes
+
+
+
 
 print()
 print()
 
-# NOTE: ensure that the serial port and baudrate (same setting in arduino) are correct
+
 serPort = []
 ports = list(serial.tools.list_ports.comports())
 for p in ports:
     if "Arduino" in p.description:
         serPort = p.description.split("(")[1][:-1]#"COM3"
 baudRate = 9600
+trodesconnect = 0
 if bool(serPort) == True:
     try:
         ser = serial.Serial(serPort, baudRate)
@@ -459,77 +481,88 @@ if bool(serPort) == True:
             print ("===========")
             print("Waiting for arduino...")
             waitForArduino()
-
-            start = time.time()
-            now = datetime.now()
-            current_time = now.strftime("%H:%M:%S")
-            starttestingTime = now.strftime("%H_")
-            fileExtension = now.strftime("%H_%M_%S")
-            testToday = date.today()
-            testDate = testToday.strftime("%m-%d-%Y")
-            testHourmargin = now.replace( hour = now.hour - 1)
-            print("Testing date: ", testDate)
-            print("Testing time start: ", current_time)
-            print("Testing for " + str(testTime) + " (sec)")
-            print ("===========")
-            print ("===========")
-            print()
-            print()
-
-            # set random seed
-            seedValue = 5
-            random.seed(seedValue)
-
-            loopcount = 0
-            turningInfoLog = {}
-            while time.time() - start < testTime:
-                testData = []
-                loopcount += 1
-                reverse = random.randrange(0,2,1)
-                steps = random.randrange(stepsmin,stepsmax+1,1)
-                cmd = '<' + str(reverse) + "," + str(steps) + "," + str(delaytime) + ">"
-                testData.append(bytes(cmd, 'utf-8')) 
-                turningInfoLog[time.time()] = [reverse, steps, delaytime]
+            print(" ")
+            print("Connecting to Trodes...")
+            trodesInfo = trodes.TrodesInfoRequester()
+            samplerate = trodesInfo.request_timerate()
+            if samplerate: 
+                trodesconnect = 1
+                print("Connected to Trodes")
+                print(" ")
+                trodesTime = trodesInfo.request_time()
+                start = time.time()
+                now = datetime.now()
+                current_time = now.strftime("%H:%M:%S")
+                starttestingTime = now.strftime("%H_")
+                fileExtension = now.strftime("%H_%M_%S")
+                testToday = date.today()
+                testDate = testToday.strftime("%m-%d-%Y")
+                testHourmargin = now.replace( hour = now.hour - 1)
+                print("Testing date: ", testDate)
+                print("Testing time start: ", current_time)
+                print("Testing for " + str(testTime) + " (sec)")
                 print ("===========")
-                runTest(testData, loopcount)
-                #testData = []
-                #cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
-                #testData.append(bytes(cmd, 'utf-8'))
-                #print("Sending stop...")
-                #runTest(testData, loopcount)
-                #time.sleep(.1)
+                print ("===========")
+                print()
+                print()
+
+                # set random seed
+                seedValue = 5
+                random.seed(seedValue)
+
+                loopcount = 0
+                turningInfoLog = {}
+                while time.time() - start < testTime:
+                    testData = []
+                    loopcount += 1
+                    reverse = random.randrange(0,2,1)
+                    steps = random.randrange(stepsmin,stepsmax+1,1)
+                    cmd = '<' + str(reverse) + "," + str(steps) + "," + str(delaytime) + ">"
+                    testData.append(bytes(cmd, 'utf-8')) 
+                    turningInfoLog[trodesInfo.request_time()] = [reverse, steps, delaytime]
+                    print ("===========")
+                    runTest(testData, loopcount)
+                    #testData = []
+                    #cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
+                    #testData.append(bytes(cmd, 'utf-8'))
+                    #print("Sending stop...")
+                    #runTest(testData, loopcount)
+                    #time.sleep(.1)
+                    print()
+                    print()
+                    print("***********")
+                    print("Time until testing done : " + str(testTime -(time.time() - start)) + " (sec)")
+                    print("***********")
+                    print()
+                    print()
+                testData = []
+                cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
+                testData.append(bytes(cmd, 'utf-8'))
+                print("Sending stop...")
+                runTest(testData, loopcount + 1)
+                print("Done testing")
+                testingTimevalue = str(time.time() - start)
+                print("Testing time: " + testingTimevalue + " (sec)")
+                ser.close()
                 print()
                 print()
                 print("***********")
-                print("Time until testing done : " + str(testTime -(time.time() - start)) + " (sec)")
-                print("***********")
-                print()
-                print()
-            testData = []
-            cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
-            testData.append(bytes(cmd, 'utf-8'))
-            print("Sending stop...")
-            runTest(testData, loopcount + 1)
-            print("Done testing")
-            testingTimevalue = str(time.time() - start)
-            print("Testing time: " + testingTimevalue + " (sec)")
-            ser.close()
-            print()
-            print()
-            print("***********")
-            print("Testing Done, stop streaming in Trodes (=disconnect)")
-            input("Press Enter to grab Trodes Log...")
-            entryOK = '0'
-            while entryOK == '0':
-              addNotes = input("Additional notes: ")
-              print(" ")
-              print("You entered: ")
-              print(addNotes)
-              entryOK = input("OK? (no=0, yes=any other key) ")
-            print("Grabbing Trodes Logs for this test...")
-            grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, fileExtension, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
-            print("Done")
-            testok = input("Test again? (no=0, yes=any other key) ")
+                print("Testing Done, stop streaming in Trodes (=disconnect)")
+                input("Press Enter to grab Trodes Log...")
+                entryOK = '0'
+                while entryOK == '0':
+                  addNotes = input("Additional notes: ")
+                  print(" ")
+                  print("You entered: ")
+                  print(addNotes)
+                  entryOK = input("OK? (no=0, yes=any other key) ")
+                print("Grabbing Trodes Logs for this test...")
+                grabTrodesLog(testDate, trodesTime, starttestingTime, testHourmargin, testingTimevalue,
+                              fileExtension, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+                print("Done")
+                testok = input("Test again? (no=0, yes=any other key) ")
+            if trodesconnect == 0:
+                print("Error connecting to Trodes...")
     except:
         print("Error with COM port...")
         print("Check connection with arduino")
