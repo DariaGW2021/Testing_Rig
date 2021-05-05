@@ -1,4 +1,4 @@
-#This program sends for a defined time period random values ( = reverse, steps and delay times) to an arduino 
+#This program sends for a defined time period random values ( = direction, steps and delay times) to an arduino 
 # for moving a stepper motor randomly back and forth with random steps and a random delay between the steps ( =>
 #determing speed)
 
@@ -12,21 +12,23 @@
 #                         The first element contains the number of bytes that the Arduino said it included in
 #                             message. This can be used to check that the full message was received.
 #                         The second element contains the message as a string
+#    residual functions are for grabbing streaming information from Trodes and saving this off in separate excel and txt files
 
 
 # the overall process:
 #   1) open the serial connection to the Arduino - which causes the Arduino to reset
 #   2) User defined values for commutator type, ID and Lab ID are entered
+#   3) start streaming in Trodes
 #   3) run this program and wait for a message from the Arduino to give it time to reset
 #   4) loop through a series of random values sent to the arduino for a specified period; feedback to and from the
 #    arduino is given
-#   5) results (=packet drops) are grabbed from Trodes debugLog files and given as different ouptput files
+#   5) results (=packet drops, disconnects) are grabbed from Trodes debugLog files and given as different ouptput files
 
 # the message to be sent to the Arduino starts with < and ends with >
 #    the message content comprises 3 integers
 #    these numbers are sent as their ascii equivalents
 #    for example <1,200,1500>
-#    this means set the motor to a reverse direction, for 200 steps with a delay of 1.5 ms between each step interval 
+#    this means set the motor counterclockwise, for 200 steps with a delay of 1.5 ms between each step interval 
 
 # receiving a message from the Arduino involves
 #    waiting until the startMarker is detected
@@ -34,15 +36,6 @@
 
 # NOTES
 #       this program does not include any timeouts to deal with delays in communication
-#
-#       for simplicity the program does NOT search for the comm port - the user must modify the
-#         code to include the correct reference.
-#         search for the lines 
-#               serPort = "COM6"
-#               baudRate = 9600
-#               ser = serial.Serial(serPort, baudRate)
-#
-
 
 #=====================================
 
@@ -51,30 +44,28 @@
 #=====================================
 def sendToArduino(sendStr):
 
-  ser.write(sendStr)
+    ser.write(sendStr)
 
 #======================================
 def recvFromArduino():
   
-  # communication with arduino to check it has received turning information
+    # communication with arduino to check it has received turning information
   
-  global startMarker, endMarker
+    global startMarker, endMarker
   
-  ck = ""
-  x = "z" # any value that is not an end- or startMarker
-  byteCount = -1 # to allow for the fact that the last increment will be one too many
-  
-  # wait for the start character
-  while  ord(x) != startMarker: 
-    x = ser.read()
-  # save data until the end marker is found
-  while ord(x) != endMarker:
-    if ord(x) != startMarker:
-      ck = ck + x.decode('utf-8')
-      byteCount += 1
-    x = ser.read()
-  
-  return(ck)
+    ck = ""
+    x = "z" # any value that is not an end- or startMarker
+    byteCount = -1 # to allow for the fact that the last increment will be one too many
+    # wait for the start character
+    while  ord(x) != startMarker: 
+        x = ser.read()
+    # save data until the end marker is found
+    while ord(x) != endMarker:
+        if ord(x) != startMarker:
+            ck = ck + x.decode('utf-8')
+            byteCount += 1
+        x = ser.read() 
+    return(ck)
 
 #============================
 def waitForArduino():
@@ -82,46 +73,36 @@ def waitForArduino():
    # wait until the Arduino sends 'Arduino Ready' - allows time for Arduino reset
    # it also ensures that any bytes left over from a previous message are discarded
    
-    global startMarker, endMarker
-    
+    global startMarker, endMarker    
     msg = ""
     while msg.find("Arduino is ready") == -1:
-
-      while ser.inWaiting() == 0:
-        pass
-        
-      msg = recvFromArduino()
-      print (msg)
+        while ser.inWaiting() == 0:
+            pass        
+        msg = recvFromArduino()
+        print (msg)
       
 #======================================
 def runTest(td,count):
   
-  # communication with arduino to send values for running motor
+    # communication with arduino to send values for running motor
   
-  numLoops = len(td)
-  waitingForReply = False
-
-  n = 0
-  while n < numLoops:
-
-    varstr = td[n]
-
-    if waitingForReply == False:
-      sendToArduino(varstr)
-      print ("Sent from PC -- LOOP # " + str(count) + ": " + varstr.decode('utf-8'))
-      waitingForReply = True
-
-    if waitingForReply == True:
-
-      while ser.inWaiting() == 0:
-        pass
-        
-      dataRecvd = recvFromArduino()
-      print ("Reply from Arduino -- Received: " + dataRecvd)
-      n += 1
-      waitingForReply = False
-
-      print ("===========")
+    numLoops = len(td)
+    waitingForReply = False
+    n = 0
+    while n < numLoops:
+        varstr = td[n]
+        if waitingForReply == False:
+            sendToArduino(varstr)
+            print ("Sent from PC -- LOOP # " + str(count) + ": " + varstr.decode('utf-8'))
+            waitingForReply = True
+        if waitingForReply == True:
+            while ser.inWaiting() == 0:
+                pass
+            dataRecvd = recvFromArduino()
+            print ("Reply from Arduino -- Received: " + dataRecvd)
+            n += 1
+            waitingForReply = False
+            print ("===========")
     
 #======================================
 def filematch(pathname):
@@ -135,35 +116,36 @@ def filematch(pathname):
     latest_file = max(list_of_files, key=os.path.getctime)
     latest_file = os.path.basename(latest_file)
     return (latest_file)
-    
-#======================================
-def write2turninginfosheet(outputPathname, outputFolder, newestFilename, turningInfoLog):
 
-    # write turning information into excel sheet
+#======================================
+def write2turninginfosheet(outputPathname, outputFolder, newestFilename, fileExtension, turningInfoLog):
+
+    # write turning information into excel file
+    
     import pandas as pd
     
-    outputFilename = "TurningInformation_" + newestFilename[:-4]  
-    with open(outputPathname + outputFolder + '/' + outputFilename + ".csv", 'w') as my_writefile:
+    outputFilename = "TurningInformation_" + newestFilename[:-4] + "_" + fileExtension + ".csv"
+    with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
           headers = pd.DataFrame( {'Time Stamp (s)': [],
                           'Direction': [],
                           'Steps (#)': [],
                           'Delay (micros)':[]})
-          headers.to_csv(my_writefile)
+          headers.to_csv(my_writefile, index = False)
           my_writefile.close()
-    commResults = pd.read_csv(outputPathname + outputFolder + '/' + outputFilename + ".csv")
+    commResults = pd.read_csv(outputPathname + outputFolder + '/' + outputFilename)
     for key,value in turningInfoLog.items():
         commResults = commResults.append(  {'Time Stamp (s)': str(key),
                           'Direction': str(value[0]),
                           'Steps (#)': str(value[1]),
                           'Delay (micros)':str(value[2])}, ignore_index = True)
-    commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename + ".csv", index=False)
+    commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename, index = False)
 
 #======================================
-def write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, TPD, PDSUMperc, LPD, errorcount):
+def write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, TPD, PDSUMperc, LPD, errorcount): 
     
     # write test information into summary txt file
     
-    outputFilename = "Summary_" + newestFilename
+    outputFilename = "Summary_" + newestFilename[:-4] + "_" + fileExtension + ".txt"
     with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
          my_writefile.write("Commutator testing on SpikeGadget's Testing Rig\n")
          my_writefile.write("Commutator type: " + modelType + "\n")
@@ -182,35 +164,37 @@ def write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, m
          my_writefile.close()
 
 #======================================
-def write2excelsheets(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount):
+def write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, packetsDropList, TPD, PDSUMperc, LPD, errorcount):
     
-    # write single packet drop information into excel sheet
+    # write single packet drop information into excel file
+    
     import pandas as pd
     from statistics import mean
     
-    outputFilename = "SinglePacketDropInformation_" + newestFilename[:-4]
-    with open(outputPathname + outputFolder + '/' + outputFilename + ".csv", 'w') as my_writefile:
+    outputFilename = "SinglePacketDropInformation_" + newestFilename[:-4] + "_" + fileExtension + ".csv"
+    with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
           headers = pd.DataFrame( {'Time Stamp': [],
                           'Packet drop': []})
-          headers.to_csv(my_writefile)
+          headers.to_csv(my_writefile, index = False)
           my_writefile.close()
-    commResults = pd.read_csv(outputPathname + outputFolder + '/' + outputFilename + ".csv")
+    commResults = pd.read_csv(outputPathname + outputFolder + '/' + outputFilename)
     for key,value in packetsDropList.items():
         commResults = commResults.append( {'Time Stamp': key[2:],
                           'Packet drop': value[2:]}, ignore_index = True)
-    commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename + ".csv", index=False)
+    commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename, index = False)
     
-    # write general packet drop information into a excel file
-    outputFilename = "PacketDropInformation_" + newestFilename[:-4]
-    with open(outputPathname + outputFolder + '/' + outputFilename + ".csv", 'w') as my_writefile:
+    # write general packet drop information into excel file
+    
+    outputFilename = "PacketDropInformation_" + newestFilename[:-4] + "_" + fileExtension + ".csv"
+    with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
          headers = pd.DataFrame( {'Mean packet drop': [],
                           'Total packet drop': [],
                           'Percentage packet drop': [],
                           'Largest packet drop': [],
                           'complete headstage disconnects': []})
-         headers.to_csv(my_writefile)
+         headers.to_csv(my_writefile, index = False)
          my_writefile.close()
-    commResults = pd.read_csv(outputPathname + outputFolder + '/' + outputFilename + ".csv")
+    commResults = pd.read_csv(outputPathname + outputFolder + '/' + outputFilename)
     pdlist = []
     for key,value in packetsDropList.items():
         pdlist.append(int(value[2:]))
@@ -221,49 +205,49 @@ def write2excelsheets(outputPathname, outputFolder, newestFilename, packetsDropL
                           'Percentage packet drop': PDSUMperc,
                           'Largest packet drop': LPD,
                           'complete headstage disconnects': str(errorcount)}, ignore_index = True)
-    commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename + ".csv", index=False)
+    commResults.to_csv(outputPathname + outputFolder + '/' + outputFilename, index = False)
          
 #=======================================
 def write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes):
   
-  # write test information into global excel sheet
-  
-  import pandas as pd
-  import os, os.path
-  
-  testRoutine = "Random turning with seed value of " + str(seedValue)
-  #ensure output folder exists
-  isdir = os.path.isdir(outputPathname + outputFolder + '/')
-  if isdir == False:
-      os.mkdir(outputPathname + outputFolder)
-  #ensure output file exists
-  isfile = os.path.isfile(outputPathname + outputFolder + '/' + excelfilename)
-  if isfile == False:
-  #if not, create with headers
-      with open(outputPathname + outputFolder + '/' + excelfilename, 'w') as my_writefile:
-          headers = pd.DataFrame( {'Model': [],
+    # write test information into global excel file
+
+    import pandas as pd
+    import os, os.path
+
+    testRoutine = "Random turning with seed value of " + str(seedValue)
+    #ensure output folder exists
+    isdir = os.path.isdir(outputPathname + outputFolder + '/')
+    if isdir == False:
+        os.mkdir(outputPathname + outputFolder)
+    #ensure output file exists
+    isfile = os.path.isfile(outputPathname + outputFolder + '/' + excelfilename)
+    if isfile == False:
+    #if not, create with headers
+        with open(outputPathname + outputFolder + '/' + excelfilename, 'w') as my_writefile:
+            headers = pd.DataFrame( {'Model': [],
                           'Serial': [], 
                           'Lab': [], 
                           'Date': [], 
                           'TestRoutine': [],
                           'TestResults': [],
                           'Notes': []})
-          headers.to_csv(my_writefile)
-          my_writefile.close()
-  commResults = pd.read_csv(outputPathname + outputFolder + '/' + excelfilename)
-  addResults = commResults.append( {'Model': modelType,
+            headers.to_csv(my_writefile, index = False)
+            my_writefile.close()
+    commResults = pd.read_csv(outputPathname + outputFolder + '/' + excelfilename)
+    addResults = commResults.append( {'Model': modelType,
                           'Serial': modelID, 
                           'Lab': labID, 
                           'Date': testDate, 
                           'TestRoutine': testRoutine,
                           'TestResults': outputFilename,
                           'Notes': addNotes}, ignore_index = True)
-  addResults.to_csv(outputPathname + outputFolder + '/' + excelfilename, index=False)
+    addResults.to_csv(outputPathname + outputFolder + '/' + excelfilename, index = False)
        
 #======================================
-def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
+def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, fileExtension, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
     
-    # save information from User and Trodes debugLog into cvs and txt files and into global excel sheet
+    # save information from User and Trodes debugLog into excel and txt files and into global excel file
     
     packetsDropList = {}
     errorcount  = 0
@@ -323,21 +307,21 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         print("Disconnects: " + str(errorcount) + "x")
         
         # write turning information into a excel sheet
-        write2turninginfosheet(outputPathname, outputFolder, newestFilename, turningInfoLog)
+        write2turninginfosheet(outputPathname, outputFolder, newestFilename, fileExtension, turningInfoLog)
         
         # write summary of Trodes Logs into txt file
-        write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
+        write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
         
         # write into global excel sheet
         write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes)
         
         # write into excel sheets
-        write2excelsheets(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
+        write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
         
 #======================================
-def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
+def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, fileExtension, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
    
-   # get information from Trodes debugLog file and forward to seperate cvs and summary txt files
+   # get information from Trodes debugLog file and forward to seperate excel and summary txt file
     
     import os, os.path
     # paths and filenames
@@ -356,11 +340,11 @@ def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, 
     # grab latest Trodes Logs matched to date and hour (and the hour before), NOT minute!!!
     newestFilename = filematch(logPathname + logFolder + '/')
     if newestFilename.find(logFilename) > -1:
-        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename,  testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+        filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, fileExtension, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
     else:
         logFilename = "trodesDebugLog_" + testDate +"(" + testHourmargin.strftime("%H_") 
         if newestFilename.find(logFilename) > -1:
-            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder,excelfilename, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+            filematched(logPathname, logFolder, newestFilename, outputPathname, outputFolder, excelfilename, fileExtension, testingTimevalue, testDate, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
         else:
             print("Error! No matching Trodes Logs found...")
 
@@ -381,6 +365,7 @@ def pythonLog(timestamp, directionValue, stepNumber, delayValue):
 #======================================
 
 import serial
+import serial.tools.list_ports
 import time
 import random
 from datetime import datetime
@@ -391,127 +376,136 @@ print()
 print()
 
 # NOTE: ensure that the serial port and baudrate (same setting in arduino) are correct
-serPort = "COM3"
+serPort = []
+ports = list(serial.tools.list_ports.comports())
+for p in ports:
+    if "Arduino" in p.description:
+        serPort = p.description.split("(")[1][:-1] #"COM3"
 baudRate = 9600
-try:
-    ser = serial.Serial(serPort, baudRate)
-    #print("Serial port " + serPort + " opened  Baudrate " + str(baudRate))
+if bool(serPort) == True:
+    try:
+        ser = serial.Serial(serPort, baudRate)
+        #print("Serial port " + serPort + " opened  Baudrate " + str(baudRate))
 
-    startMarker = 60
-    endMarker = 62
+        startMarker = 60
+        endMarker = 62
 
-    # delay between each step in microseconds 
-    delaytime = 1500 
-    # calculate steps per revolution, default motor is 200 steps per revolution with 10 ms delay between steps
-    SPR = ((delaytime/1000)*200)/10
+        # delay between each step in microseconds 
+        delaytime = 1500 
+        # calculate steps per revolution, default motor is 200 steps per revolution with 10 ms delay between steps
+        SPR = ((delaytime/1000)*200)/10
 
-    # set min and max revolutions 
-    revolutionmin = 2
-    revolutionmax = 8
-    # calculate steps to send to motor
-    stepsmin = round(revolutionmin*SPR)
-    stepsmax = round(revolutionmax*SPR)
-    testok = '1'
-    while testok == '1':
-        entryOK = '0';
-        # Enter commutator model type, ID and for which lab:
-        while entryOK == '0':
-          print(" ")
-          modelType = input("Enter commutator model type: ")
-          print(" ")
-          modelID = input("Enter commutator model ID: ")
-          print(" ")
-          labID = input("Enter Lab: ")
-          print(" ")
-          print("You entered: ")
-          print(modelType)
-          print(modelID)
-          print(labID)
-          print(" ")
-          entryOK = input("OK? (no=0, yes=any other key)")
+        # set min and max revolutions 
+        revolutionmin = 2
+        revolutionmax = 8
+        # calculate steps to send to motor
+        stepsmin = round(revolutionmin*SPR)
+        stepsmax = round(revolutionmax*SPR)
+        testok = '1'
+        while testok == '1':
+            entryOK = '0';
+            # Enter commutator model type, ID and for which lab:
+            while entryOK == '0':
+              print(" ")
+              modelType = input("Enter commutator model type: ")
+              print(" ")
+              modelID = input("Enter commutator model ID: ")
+              print(" ")
+              labID = input("Enter Lab: ")
+              print(" ")
+              print("You entered: ")
+              print(modelType)
+              print(modelID)
+              print(labID)
+              print(" ")
+              entryOK = input("OK? (no=0, yes=any other key) ")
 
-        print(" ")
-        print("Before testing start, ensure that Trodes is streaming (=connect to source)")
-        input("Press Enter to start...")
-        print()
-        print()
-        print ("===========")
-        print ("===========")
-        print("Waiting for arduino...")
-        waitForArduino()
-
-        # set test time
-        testTime = 15 #*30
-
-        start = time.time()
-        now = datetime.now()
-        current_time = now.strftime("%H:%M:%S")
-        starttestingTime = now.strftime("%H_")
-        testToday = date.today()
-        testDate = testToday.strftime("%m-%d-%Y")
-        testHourmargin = now.replace( hour = now.hour - 1)
-        print("Testing date: ", testDate)
-        print("Testing time start: ", current_time)
-        print("Testing for " + str(testTime) + " (sec)")
-        print ("===========")
-        print ("===========")
-        print()
-        print()
-
-        # set random seed
-        seedValue = 5
-        random.seed(seedValue)
-
-        loopcount = 0
-        turningInfoLog = {}
-        while time.time() - start < testTime:
-            testData = []
-            loopcount+=1
-            reverse = random.randrange(0,2,1)
-            steps = random.randrange(stepsmin,stepsmax+1,1)
-            cmd = '<' + str(reverse) + "," + str(steps) + "," + str(delaytime) + ">"
-            testData.append(bytes(cmd, 'utf-8')) 
-            turningInfoLog[time.time()] = [reverse, steps, delaytime]
+            print(" ")
+            print("Before testing start, ensure that Trodes is streaming (=connect to source)")
+            input("Press Enter to start...")
+            print()
+            print()
             print ("===========")
-            runTest(testData, loopcount)
-            #testData = []
-            #cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
-            #testData.append(bytes(cmd, 'utf-8'))
-            #print("Sending stop...")
-            #runTest(testData, loopcount)
-            #time.sleep(.1)
+            print ("===========")
+            print("Waiting for arduino...")
+            waitForArduino()
+
+            # set test time
+            testTime = 15 #*30
+
+            start = time.time()
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            starttestingTime = now.strftime("%H_")
+            fileExtension = now.strftime("%H_%M_%S")
+            testToday = date.today()
+            testDate = testToday.strftime("%m-%d-%Y")
+            testHourmargin = now.replace( hour = now.hour - 1)
+            print("Testing date: ", testDate)
+            print("Testing time start: ", current_time)
+            print("Testing for " + str(testTime) + " (sec)")
+            print ("===========")
+            print ("===========")
+            print()
+            print()
+
+            # set random seed
+            seedValue = 5
+            random.seed(seedValue)
+
+            loopcount = 0
+            turningInfoLog = {}
+            while time.time() - start < testTime:
+                testData = []
+                loopcount+=1
+                reverse = random.randrange(0,2,1)
+                steps = random.randrange(stepsmin,stepsmax+1,1)
+                cmd = '<' + str(reverse) + "," + str(steps) + "," + str(delaytime) + ">"
+                testData.append(bytes(cmd, 'utf-8')) 
+                turningInfoLog[time.time()] = [reverse, steps, delaytime]
+                print ("===========")
+                runTest(testData, loopcount)
+                #testData = []
+                #cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
+                #testData.append(bytes(cmd, 'utf-8'))
+                #print("Sending stop...")
+                #runTest(testData, loopcount)
+                #time.sleep(.1)
+                print()
+                print()
+                print("***********")
+                print("Time until testing done : " + str(testTime -(time.time() - start)) + " (sec)")
+                print("***********")
+                print()
+                print()
+            testData = []
+            cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
+            testData.append(bytes(cmd, 'utf-8'))
+            print("Sending stop...")
+            runTest(testData, loopcount + 1)
+            print("Done testing")
+            testingTimevalue = str(time.time() - start)
+            print("Testing time: " + testingTimevalue + " (sec)")
+            ser.close()
             print()
             print()
             print("***********")
-            print("Time until testing done : " + str(testTime -(time.time() - start)) + " (sec)")
-            print("***********")
-            print()
-            print()
-        testData = []
-        cmd = '<' + str(0) + "," + str(0) + "," + str(0) + ">"
-        testData.append(bytes(cmd, 'utf-8'))
-        print("Sending stop...")
-        runTest(testData, loopcount + 1)
-        print("Done testing")
-        testingTimevalue = str(time.time() - start)
-        print("Testing time: " + testingTimevalue + " (sec)")
-        ser.close()
-        print()
-        print()
-        print("***********")
-        print("Testing Done, stop streaming in Trodes (=disconnect)")
-        input("Press Enter to grab Trodes Log...")
-        entryOK = '0';
-        while entryOK == '0':
-          addNotes = input("Additional notes: ")
-          print(" ")
-          print("You entered: ")
-          print(addNotes)
-          entryOK = input("OK? (no=0, yes=any other key)")
-        print("Grabbing Trodes Logs for this test...")
-        grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
-        print("Done")
-        testok = input("Test again? (no=0, yes=any other key)")
-except:
+            print("Testing Done, stop streaming in Trodes (=disconnect)")
+            input("Press Enter to grab Trodes Log...")
+            entryOK = '0'
+            while entryOK == '0':
+              addNotes = input("Additional notes: ")
+              print(" ")
+              print("You entered: ")
+              print(addNotes)
+              entryOK = input("OK? (no=0, yes=any other key) ")
+            print("Grabbing Trodes Logs for this test...")
+            grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, fileExtension, seedValue, turningInfoLog, modelType, modelID, labID, addNotes)
+            print("Done")
+            testok = input("Test again? (no=0, yes=any other key) ")
+    except:
+        print("Error with COM port...")
+        print("Check connection with arduino")
+if bool(serPort) == False:
     print("Error with COM port...")
-    print("Check connection with arduino")
+    print("Arduino not found")
