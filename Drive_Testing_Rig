@@ -136,15 +136,25 @@ def filematch(pathname):
     latest_file = os.path.basename(latest_file)
     return (latest_file)
 #======================================
-def write2turninginfofile(outputPathname, outputFolder, newestFilename, turningInfoLog):
+def write2turninginfosheet(outputPathname, outputFolder, newestFilename, turningInfoLog):
 
     # write turning information into excel sheet
-    outputFilename = "TurningInformation_" + newestFilename   
-    with open(outputPathname + outputFolder + '/' + outputFilename, 'w') as my_writefile:
-        my_writefile.write("Turning information (timestamp in seconds: direction change, step number and delay value in micros): \n")
-        for key,value in turningInfoLog.items():
-            my_writefile.write(str(key) + ": " + str(value) + "\n") 
-        my_writefile.close()
+    
+    outputFilename = "TurningInformation_" + newestFilename[:-4]  
+    with open(outputPathname + outputFolder + '/' + ouputFilename + ".cvs", 'w') as my_writefile:
+          headers = pd.DataFrame( {'Time Stamp (s)': [],
+                          'Direction': [],
+                          'Steps (#)': [],
+                          'Delay (micros)':[]})
+          headers.to_csv(my_writefile)
+          my_writefile.close()
+    commResults = pd.read_csv(outputPathname + outputFolder + '/' + ouputFilename + ".cvs")
+    for key,value in turningInfoLog.items():
+        commResults = commResults.append(  {'Time Stamp (s)': str(key),
+                          'Direction': str(value[0]),
+                          'Steps (#)': str(value[1]),
+                          'Delay (micros)':str(value[2])}, ignore_index = True)
+    commResults.to_csv(outputPathname + outputFolder + '/' + ouputFilename + ".cvs", index=False)
 
 #======================================
 def write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, modelID, labID, testDate, testingTimevalue, seedValue, TPD, PDSUMperc, LPD, errorcount):
@@ -304,7 +314,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         print("Disconnects: " + str(errorcount) + "x")
         
         # write turning information into a new file
-        (outputPathname, outputFolder, newestFilename, turningInfoLog)
+        write2turninginfosheet(outputPathname, outputFolder, newestFilename, turningInfoLog)
         
         # write summary of Trodes Logs into new file
         write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, modelID, labID, testDate, testingTimevalue, seedValue, TPD, PDSUMperc, LPD, errorcount)
