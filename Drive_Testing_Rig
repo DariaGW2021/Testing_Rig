@@ -313,16 +313,16 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         print("LPD: " + LPD)
         print("Disconnects: " + str(errorcount) + "x")
         
-        # write turning information into a new file
+        # write turning information into a excel sheet
         write2turninginfosheet(outputPathname, outputFolder, newestFilename, turningInfoLog)
         
-        # write summary of Trodes Logs into new file
+        # write summary of Trodes Logs into txt file
         write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, modelID, labID, testDate, testingTimevalue, seedValue, TPD, PDSUMperc, LPD, errorcount)
         
         # write into global excel sheet
         write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes)
         
-        # write into excel sheet
+        # write into excel sheets
         write2excelsheets(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
         
 #======================================
