@@ -170,7 +170,7 @@ def write2summaryfile(outputPathname, outputFolder, newestFilename, modelType, m
          my_writefile.close()
 
 #======================================
-def write2excelsheet(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount):
+def write2excelsheets(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount):
     
     # write single packet drop information into excel sheet
     
@@ -186,7 +186,7 @@ def write2excelsheet(outputPathname, outputFolder, newestFilename, packetsDropLi
                           'Packet drop': value[2:]}, ignore_index = True)
     commResults.to_csv(outputPathname + outputFolder + '/' + ouputFilename + ".cvs", index=False)
     
-    # write general packet drop information into a txt file
+    # write general packet drop information into a excel file
     outputFilename = "PacketDropInformation_" + newestFilename[:-4]
     with open(outputPathname + outputFolder + '/' + ouputFilename + ".cvs", 'w') as my_writefile:
          pdlist = []
@@ -194,12 +194,12 @@ def write2excelsheet(outputPathname, outputFolder, newestFilename, packetsDropLi
              pdlist.append(int(value[2:]))
          if len(pdlist) == 0:
             pdlist.append(0)
-         headers = pd.DataFrame( {'Mean packet drop': str(mean(pdlist)),
+         df = pd.DataFrame( {'Mean packet drop': str(mean(pdlist)),
                           'Total packet drop': TPD,
                           'Percentage packet drop': PDSUMperc,
                           'Largest packet drop': LPD,
                           'complete headstage disconnects': str(errorcount)})
-          headers.to_csv(my_writefile)
+          df.to_csv(my_writefile)
           my_writefile.close()
          
 #=======================================
@@ -313,7 +313,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         write2globalexcelsheet(excelfilename, outputPathname, outputFolder, modelType, modelID, labID, testDate, seedValue, outputFilename, addNotes)
         
         # write into excel sheet
-        write2excelsheet(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
+        write2excelsheets(outputPathname, outputFolder, newestFilename, packetsDropList, TPD, PDSUMperc, LPD, errorcount)
         
 #======================================
 def grabTrodesLog(testDate, starttestingTime, testHourmargin, testingTimevalue, seedValue, turningInfoLog, modelType, modelID, labID, addNotes):
