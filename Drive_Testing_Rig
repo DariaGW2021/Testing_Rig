@@ -6,6 +6,7 @@
 # it is designed to work with ... stepper_turntable_v2_python2arduino_v2.ino ...
 
 # The key functions are:
+#
 #    sendToArduino(str) which sends the given string to the Arduino. The string may 
 #                       contain characters with any of the values 0 to 255
 #
@@ -13,6 +14,7 @@
 #                         The first element contains the number of bytes that the Arduino said it included in
 #                             message. This can be used to check that the full message was received.
 #                         The second element contains the message as a string
+#
 #    residual functions are for grabbing streaming information from Trodes and saving this off in separate excel and txt files
 
 
