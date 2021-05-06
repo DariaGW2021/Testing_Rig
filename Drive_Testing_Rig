@@ -393,7 +393,7 @@ import random
 from datetime import datetime
 import time
 from datetime import date
-from trodesnetwork import trodes
+#from trodesnetwork import trodes
 
 
 
@@ -483,13 +483,13 @@ if bool(serPort) == True:
             waitForArduino()
             print(" ")
             print("Connecting to Trodes...")
-            trodesInfo = trodes.TrodesInfoRequester()
-            samplerate = trodesInfo.request_timerate()
+            #trodesInfo = trodes.TrodesInfoRequester()
+            samplerate = 10 #trodesInfo.request_timerate()
             if samplerate: 
                 trodesconnect = 1
                 print("Connected to Trodes")
                 print(" ")
-                trodesTime = trodesInfo.request_time()
+                trodesTime = 123456789 #trodesInfo.request_time()
                 start = time.time()
                 now = datetime.now()
                 current_time = now.strftime("%H:%M:%S")
