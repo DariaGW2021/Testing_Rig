@@ -291,10 +291,10 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
                     indxstart = line.strip().find(timestampLog)+len(timestampLog)+1
                     foundtimestamp = line.strip()[indxstart:]
                     # ensure time stamp is larger than test start time
-                    if int(foundtimestamp) >= trodesTime:
-                        indxstart = line.strip().find(warningLog)+len(warningLog)+1
-                        indxend = line.strip().find("at")-1
-                        packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
+                    #if int(foundtimestamp) >= trodesTime:
+                    indxstart = line.strip().find(warningLog)+len(warningLog)+1
+                    indxend = line.strip().find("at")-1
+                    packetsDropList["TS" + foundtimestamp] = "PD" + line.strip()[indxstart:indxend]
                 if line.strip().find(errorLog) > -1:
                     errorcount += 1
                 if line.strip().find(totalpacketdropLog) > -1:
@@ -484,7 +484,7 @@ if bool(serPort) == True:
             print(" ")
             print("Connecting to Trodes...")
             #trodesInfo = trodes.TrodesInfoRequester()
-            samplerate = 10 #trodesInfo.request_timerate()
+            samplerate = 30000 #trodesInfo.request_timerate()
             if samplerate: 
                 trodesconnect = 1
                 print("Connected to Trodes")
@@ -519,7 +519,8 @@ if bool(serPort) == True:
                     steps = random.randrange(stepsmin,stepsmax+1,1)
                     cmd = '<' + str(reverse) + "," + str(steps) + "," + str(delaytime) + ">"
                     testData.append(bytes(cmd, 'utf-8')) 
-                    turningInfoLog[trodesInfo.request_time()] = [reverse, steps, delaytime]
+                    #turningInfoLog[trodesInfo.request_time()] = [reverse, steps, delaytime]
+                    turningInfoLog[time.time()] = [reverse, steps, delaytime]
                     print ("===========")
                     runTest(testData, loopcount)
                     #testData = []
