@@ -166,7 +166,7 @@ def write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtensio
          my_writefile.write("Largest packet drop amount: " + LPD + "\n")
          my_writefile.write("Number of complete disconnects with headstage: " + str(errorcount) + "\n")
          my_writefile.close()
-
+         return(outputFilename)
 #======================================
 def write2excelsheets(outputPathname, outputFolder, newestFilename, fileExtension, testingTimevalue,
                       packetsDropList, TPD, PDSUMperc, LPD, errorcount):
@@ -276,7 +276,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
     # look through all log lines
     packetsDropList = {}
     errorcount  = 0
-    logInis = [-5]
+    logInis = [-5, -5, -5]
     with open(logPathname + logFolder + '/' + newestFilename, 'r') as my_file:
         # check how many separate Trode streams
         for linevalue,line in enumerate(my_file):
@@ -323,7 +323,7 @@ def filematched(logPathname, logFolder, newestFilename, outputPathname, outputFo
         write2turninginfosheet(outputPathname, outputFolder, newestFilename, fileExtension, turningInfoLog)
         
         # write summary of Trodes Logs into txt file
-        write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, 
+        outputFilename = write2summaryfile(outputPathname, outputFolder, newestFilename, fileExtension, modelType, 
                           modelID, labID, testDate, testingTimevalue, seedValue, packetsDropList, 
                           TPD, PDSUMperc, LPD, errorcount)
         
@@ -391,7 +391,6 @@ import serial.tools.list_ports
 import time
 import random
 from datetime import datetime
-import time
 from datetime import date
 #from trodesnetwork import trodes
 
@@ -406,37 +405,40 @@ serPort = []
 ports = list(serial.tools.list_ports.comports())
 for p in ports:
     if "Arduino" in p.description:
-        serPort = p.description.split("(")[1][:-1]#"COM3"
+        serPort = p.description.split("(")[1][:-1]
 baudRate = 9600
 trodesconnect = 0
+arduinoconnect = 0
 if bool(serPort) == True:
-    try:
-        ser = serial.Serial(serPort, baudRate)
-        #print("Serial port " + serPort + " opened  Baudrate " + str(baudRate))
-        
-        # values for communicating with arduino
-        startMarker = 60
-        endMarker = 62
+    # values for communicating with arduino
+    startMarker = 60
+    endMarker = 62
 
-        # delay between each step in microseconds 
-        delaytime = 1500 
-        # calculate steps per revolution, default motor is 200 steps per revolution with 10 ms delay between steps
-        SPR = ((delaytime/1000)*200)/10
+    # delay between each step in microseconds 
+    delaytime = 1500 
+    # calculate steps per revolution, default motor is 200 steps per revolution with 10 ms delay between steps
+    SPR = ((delaytime/1000)*200)/10
 
-        # set min and max revolutions 
-        revolutionmin = 2
-        revolutionmax = 8
-        # calculate steps to send to motor
-        stepsmin = round(revolutionmin*SPR)
-        stepsmax = round(revolutionmax*SPR)
+    # set min and max revolutions 
+    revolutionmin = 2
+    revolutionmax = 8
+    # calculate steps to send to motor
+    stepsmin = round(revolutionmin*SPR)
+    stepsmax = round(revolutionmax*SPR)
         
-        testok = '1'
-        firstEntry = 0
-        while testok != '0':
+    testok = '1'
+    firstEntry = 0
+    while testok != '0':
+        try:
+            arduinoconnect = 1
+            ser = serial.Serial(serPort, baudRate)
+            print("Connected to arduino")
+            print(" ")
+            #print("Serial port " + serPort + " opened  Baudrate " + str(baudRate))
             if firstEntry == 0:
                 entryOK = '0';
             elif firstEntry == 1:
-                entryOK = input("Last entry: ")
+                print("Last entry: ")
                 print(modelType)
                 print(modelID)
                 print(labID)
@@ -482,14 +484,14 @@ if bool(serPort) == True:
             print("Waiting for arduino...")
             waitForArduino()
             print(" ")
-            print("Connecting to Trodes...")
+            #print("Connecting to Trodes...")
             #trodesInfo = trodes.TrodesInfoRequester()
-            samplerate = 30000 #trodesInfo.request_timerate()
+            samplerate = 30000#trodesInfo.request_timerate()
             if samplerate: 
                 trodesconnect = 1
-                print("Connected to Trodes")
+                #print("Connected to Trodes")
                 print(" ")
-                trodesTime = 123456789 #trodesInfo.request_time()
+                trodesTime = 123456789#trodesInfo.request_time()
                 start = time.time()
                 now = datetime.now()
                 current_time = now.strftime("%H:%M:%S")
@@ -564,9 +566,13 @@ if bool(serPort) == True:
                 testok = input("Test again? (no=0, yes=any other key) ")
             if trodesconnect == 0:
                 print("Error connecting to Trodes...")
-    except:
-        print("Error with COM port...")
-        print("Check connection with arduino")
+        except:
+            print("Error...")
+            #print("Error with COM port...")
+            #print("Check connection with arduino")
 if bool(serPort) == False:
     print("Error with COM port...")
     print("Arduino not found")
+if arduinoconnect == 0:
+    print("Error with COM port...")
+    print("Check connection with arduino")
